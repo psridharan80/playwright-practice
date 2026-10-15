@@ -21,6 +21,7 @@ test('top navigation links go to the right pages', async ({ page }) => {
 
   await nav.getByRole('link', { name: 'Mentorship' }).click();
   await expect(page).toHaveURL(/mentorship/i);
+  await expect(page.getByRole('heading').first()).toBeVisible();
 });
 
 test('sign up form accepts input and rejects a bad email', async ({ page }) => {
