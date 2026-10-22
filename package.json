@@ -10,6 +10,8 @@
   "type": "commonjs",
   "devDependencies": {
     "@playwright/test": "^1.64.0",
-    "@types/node": "^26.6.4"
+    "@types/node": "^26.6.4",
+    "dotenv": "^18.0.8",
+    "mysql2": "^3.24.6"
   }
 }
