@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
+import { getRandomUser } from '../utils/db';
 
 // Practice shop: https://rahulshettyacademy.com/client
 // Test account on a demo site. In a real project, read credentials from
@@ -7,7 +8,7 @@ const USER = {
   email: 'first.last@email.com',
   password: 'Test1234',
 };
-const PRODUCT = 'ADIDAS ORIGINAL';
+const PRODUCTS = ['ADIDAS ORIGINAL', 'ZARA COAT 3'];
 
 async function login(page: Page) {
   await page.goto('https://rahulshettyacademy.com/client');
@@ -19,16 +20,19 @@ async function login(page: Page) {
 
 test.describe('Shop', () => {
   test('new user can register', async ({ page }) => {
-    // Unique email per run, so the test can be repeated
-    const email = `first.last.${Date.now()}@email.com`;
+    // Registration data comes from the Users table in the e2e-mysql container
+    const user = await getRandomUser();
+    // Unique email per run (firstname.lastname.<timestamp>), so the test can be repeated
+    const email = user.email.replace('@', `.${Date.now()}@`);
+    test.info().annotations.push({ type: 'db user', description: `${user.firstName} ${user.lastName} <${email}>` });
 
     await page.goto('https://rahulshettyacademy.com/client/#/auth/register');
-    await page.locator('#firstName').fill('Dummy');
-    await page.locator('#lastName').fill('User');
+    await page.locator('#firstName').fill(user.firstName);
+    await page.locator('#lastName').fill(user.lastName);
     await page.locator('#userEmail').fill(email);
-    await page.locator('#userMobile').fill('2223320096');
-    await page.locator('select[formcontrolname="occupation"]').selectOption('Student');
-    await page.getByRole('radio', { name: 'Male', exact: true }).check();
+    await page.locator('#userMobile').fill(user.phone);
+    await page.locator('select[formcontrolname="occupation"]').selectOption(user.occupation);
+    await page.getByRole('radio', { name: user.gender, exact: true }).check();
     await page.locator('#userPassword').fill(USER.password);
     await page.locator('#confirmPassword').fill(USER.password);
     await page.getByRole('checkbox').check();
@@ -41,16 +45,27 @@ test.describe('Shop', () => {
     await login(page);
 
     await expect(page.getByRole('button', { name: 'Sign Out' })).toBeVisible();
-    await expect(page.getByText(PRODUCT)).toBeVisible();
+    for (const product of PRODUCTS) {
+      await expect(page.getByText(product)).toBeVisible();
+    }
+        await expect(page).toHaveTitle("Let's Shop");
+    for (const product of PRODUCTS) {
+      await expect(page.getByText(product)).toBeVisible();
+    }
+
   });
 
   test('user can order a product and find it in order history', async ({ page }) => {
     await login(page);
 
+    // Pick one product at random and record it in the report
+    const product = PRODUCTS[Math.floor(Math.random() * PRODUCTS.length)];
+    test.info().annotations.push({ type: 'product', description: product });
+
     await test.step('add product to cart', async () => {
       await page
         .locator('.card-body')
-        .filter({ hasText: PRODUCT })
+        .filter({ hasText: product })
         .getByRole('button', { name: 'Add To Cart' })
         .click();
       await expect(page.getByText('Product Added To Cart')).toBeVisible();
@@ -58,7 +73,7 @@ test.describe('Shop', () => {
 
     await test.step('check the cart', async () => {
       await page.locator('[routerlink*="cart"]').click();
-      await expect(page.getByRole('heading', { name: PRODUCT }).first()).toBeVisible();
+      await expect(page.getByRole('heading', { name: product }).first()).toBeVisible();
       await page.getByRole('button', { name: /Checkout/ }).click();
     });
 
@@ -73,13 +88,27 @@ test.describe('Shop', () => {
 
     const orderId = await test.step('confirm order placed', async () => {
       await expect(page.getByRole('heading', { name: /Thankyou for the order/i })).toBeVisible();
+      await expect(page.getByText(product).first()).toBeVisible();
       const idText = await page.locator('label.ng-star-inserted').first().textContent();
       return idText!.replace(/\|/g, '').trim();
     });
 
+    const orderRow = page.getByRole('row').filter({ hasText: orderId });
+
     await test.step('find order in history', async () => {
       await page.getByText('Orders History Page').click();
       await expect(page.getByRole('rowheader', { name: orderId })).toBeVisible();
+      await expect(orderRow).toContainText(product);
+    });
+
+    await test.step('open order details', async () => {
+      await orderRow.getByRole('button', { name: 'View' }).click();
+      await expect(page.getByText(orderId)).toBeVisible();
+    });
+
+    await test.step('sign out', async () => {
+      await page.getByRole('button', { name: 'Sign Out' }).click();
+      await expect(page).toHaveURL(/login/);
     });
   });
 });
