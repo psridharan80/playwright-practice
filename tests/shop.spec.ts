@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
+import { getRandomUser } from '../utils/db';
 
 // Practice shop: https://rahulshettyacademy.com/client
 // Test account on a demo site. In a real project, read credentials from
@@ -19,16 +20,19 @@ async function login(page: Page) {
 
 test.describe('Shop', () => {
   test('new user can register', async ({ page }) => {
-    // Unique email per run, so the test can be repeated
-    const email = `first.last.${Date.now()}@email.com`;
+    // Registration data comes from the Users table in the e2e-mysql container
+    const user = await getRandomUser();
+    // Unique email per run (firstname.lastname.<timestamp>), so the test can be repeated
+    const email = user.email.replace('@', `.${Date.now()}@`);
+    test.info().annotations.push({ type: 'db user', description: `${user.firstName} ${user.lastName} <${email}>` });
 
     await page.goto('https://rahulshettyacademy.com/client/#/auth/register');
-    await page.locator('#firstName').fill('Dummy');
-    await page.locator('#lastName').fill('User');
+    await page.locator('#firstName').fill(user.firstName);
+    await page.locator('#lastName').fill(user.lastName);
     await page.locator('#userEmail').fill(email);
-    await page.locator('#userMobile').fill('2223320096');
-    await page.locator('select[formcontrolname="occupation"]').selectOption('Student');
-    await page.getByRole('radio', { name: 'Male', exact: true }).check();
+    await page.locator('#userMobile').fill(user.phone);
+    await page.locator('select[formcontrolname="occupation"]').selectOption(user.occupation);
+    await page.getByRole('radio', { name: user.gender, exact: true }).check();
     await page.locator('#userPassword').fill(USER.password);
     await page.locator('#confirmPassword').fill(USER.password);
     await page.getByRole('checkbox').check();
