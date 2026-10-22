@@ -41,6 +41,7 @@ test.describe('Shop', () => {
     await login(page);
 
     await expect(page.getByRole('button', { name: 'Sign Out' })).toBeVisible();
+    await expect(page).toHaveTitle("Let's Shop");
     await expect(page.getByText(PRODUCT)).toBeVisible();
   });
 
@@ -73,13 +74,27 @@ test.describe('Shop', () => {
 
     const orderId = await test.step('confirm order placed', async () => {
       await expect(page.getByRole('heading', { name: /Thankyou for the order/i })).toBeVisible();
+      await expect(page.getByText(PRODUCT).first()).toBeVisible();
       const idText = await page.locator('label.ng-star-inserted').first().textContent();
       return idText!.replace(/\|/g, '').trim();
     });
 
+    const orderRow = page.getByRole('row').filter({ hasText: orderId });
+
     await test.step('find order in history', async () => {
       await page.getByText('Orders History Page').click();
       await expect(page.getByRole('rowheader', { name: orderId })).toBeVisible();
+      await expect(orderRow).toContainText(PRODUCT);
+    });
+
+    await test.step('open order details', async () => {
+      await orderRow.getByRole('button', { name: 'View' }).click();
+      await expect(page.getByText(orderId)).toBeVisible();
+    });
+
+    await test.step('sign out', async () => {
+      await page.getByRole('button', { name: 'Sign Out' }).click();
+      await expect(page).toHaveURL(/login/);
     });
   });
 });
