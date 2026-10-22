@@ -8,7 +8,7 @@ const USER = {
   email: 'first.last@email.com',
   password: 'Test1234',
 };
-const PRODUCT = 'ADIDAS ORIGINAL';
+const PRODUCTS = ['ADIDAS ORIGINAL', 'ZARA COAT 3'];
 
 async function login(page: Page) {
   await page.goto('https://rahulshettyacademy.com/client');
@@ -45,17 +45,27 @@ test.describe('Shop', () => {
     await login(page);
 
     await expect(page.getByRole('button', { name: 'Sign Out' })).toBeVisible();
-    await expect(page).toHaveTitle("Let's Shop");
-    await expect(page.getByText(PRODUCT)).toBeVisible();
+    for (const product of PRODUCTS) {
+      await expect(page.getByText(product)).toBeVisible();
+    }
+        await expect(page).toHaveTitle("Let's Shop");
+    for (const product of PRODUCTS) {
+      await expect(page.getByText(product)).toBeVisible();
+    }
+
   });
 
   test('user can order a product and find it in order history', async ({ page }) => {
     await login(page);
 
+    // Pick one product at random and record it in the report
+    const product = PRODUCTS[Math.floor(Math.random() * PRODUCTS.length)];
+    test.info().annotations.push({ type: 'product', description: product });
+
     await test.step('add product to cart', async () => {
       await page
         .locator('.card-body')
-        .filter({ hasText: PRODUCT })
+        .filter({ hasText: product })
         .getByRole('button', { name: 'Add To Cart' })
         .click();
       await expect(page.getByText('Product Added To Cart')).toBeVisible();
@@ -63,7 +73,7 @@ test.describe('Shop', () => {
 
     await test.step('check the cart', async () => {
       await page.locator('[routerlink*="cart"]').click();
-      await expect(page.getByRole('heading', { name: PRODUCT }).first()).toBeVisible();
+      await expect(page.getByRole('heading', { name: product }).first()).toBeVisible();
       await page.getByRole('button', { name: /Checkout/ }).click();
     });
 
@@ -78,7 +88,7 @@ test.describe('Shop', () => {
 
     const orderId = await test.step('confirm order placed', async () => {
       await expect(page.getByRole('heading', { name: /Thankyou for the order/i })).toBeVisible();
-      await expect(page.getByText(PRODUCT).first()).toBeVisible();
+      await expect(page.getByText(product).first()).toBeVisible();
       const idText = await page.locator('label.ng-star-inserted').first().textContent();
       return idText!.replace(/\|/g, '').trim();
     });
@@ -88,7 +98,7 @@ test.describe('Shop', () => {
     await test.step('find order in history', async () => {
       await page.getByText('Orders History Page').click();
       await expect(page.getByRole('rowheader', { name: orderId })).toBeVisible();
-      await expect(orderRow).toContainText(PRODUCT);
+      await expect(orderRow).toContainText(product);
     });
 
     await test.step('open order details', async () => {
